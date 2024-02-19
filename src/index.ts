@@ -1,3 +1,4 @@
+require('dotenv').config()
 import { initServer } from "./app/server";
 
 async function init() {
