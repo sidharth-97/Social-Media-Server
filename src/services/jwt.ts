@@ -1,15 +1,22 @@
 import JWT from "jsonwebtoken"
-import { prismaClient } from "../clients/db"
 import { User } from "@prisma/client"
+import { JWTUser } from "../interfaces"
 
 class JWTService{
     public static async generateToken(user:User) {
-        const payload = {
+        const payload:JWTUser = {
             id: user?.id,
             email:user?.email
         }
         const token = JWT.sign(payload, process.env.JWT_SECRET as string)
         return token
+    }
+    public static decodeToken(token: string) {
+        try {
+            return JWT.verify(token,process.env.JWT_SECRET as string)as JWTUser
+        } catch (error) {
+            return null
+        }
     }
 }
 
