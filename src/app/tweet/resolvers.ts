@@ -3,6 +3,7 @@ import { prismaClient } from "../../clients/db"
 import { GraphqlContext } from "../../interfaces"
 import { S3Client,PutObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { redisClient } from "../../clients/redis"
 
 interface CreateTweetPayload{
     content:string
@@ -29,6 +30,8 @@ const queries = {
 const mutations = {
     createTweet: async (parent: any, { payload }: { payload: CreateTweetPayload }, ctx: GraphqlContext) => {
         if (!ctx.user) throw new Error("You are not authenticated")
+        const rateLimit = await redisClient.get(`RATE_LIMIT:TWEET:${ctx.user.id}`)
+        if(rateLimit)throw new Error("Please wait ... ")
        const tweet= await prismaClient.tweet.create({
             data: {
                 content: payload.content,
@@ -36,6 +39,7 @@ const mutations = {
                 author:{connect:{id:ctx.user.id}}
         }
        })
+        await redisClient.setex(`RATE_LIMIT:TWEET:${ctx.user.id}`,10,1)
         return tweet
     }
 }

@@ -2,6 +2,7 @@ import { prismaClient } from "../../clients/db";
 import { GraphqlContext } from "../../interfaces";
 import { User } from "@prisma/client";
 import UserService from "../../services/user";
+import { redisClient } from "../../clients/redis";
 
 const queries = {
   verifyGoogleToken: async (parent: any, { token }: { token: string }) => {
@@ -46,6 +47,8 @@ const extraResolvers = {
     },
     recommendedUsers: async (parent: any, _: any, ctx: GraphqlContext) => {
       if (!ctx.user) return [];
+      const cachedData = await redisClient.get(`REC_USER:${ctx.user.id}`)
+      if(cachedData)return JSON.parse(cachedData)
       const myFollowing = await prismaClient.follows.findMany({
         where: {
           follower: { id: ctx.user.id },
@@ -70,6 +73,7 @@ const extraResolvers = {
           }
         }
       }
+      await redisClient.set(`REC_USER:${ctx.user.id}`,JSON.stringify(users))
       return users;
     },
   },
@@ -83,6 +87,7 @@ const mutations = {
   ) => {
     if (!ctx.user || !ctx.user.id) throw new Error("Unauthenticated");
     await UserService.followUser(ctx.user.id, to);
+    await redisClient.del(`REC_USER:${ctx.user.id}`)
     return true;
   },
   UnfollowUser: async (
@@ -92,6 +97,7 @@ const mutations = {
   ) => {
     if (!ctx.user || !ctx.user.id) throw new Error("Unauthenticated");
     await UserService.unfollowUser(ctx.user.id, to);
+    await redisClient.del(`REC_USER:${ctx.user.id}`)
     return true;
   },
 };
